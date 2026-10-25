@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -23,7 +22,7 @@ from pathlib import Path
 # 允许 `python src/llm_report/cli.py` 直接运行
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from llm_report import (  # noqa: E402
+from llm_report import (
     BATCH_SYSTEM_PROMPT,
     LLMClient,
     LLMConfig,
@@ -31,7 +30,7 @@ from llm_report import (  # noqa: E402
     build_batch_prompt,
     parse_items,
 )
-from validator import render_review_sheet, validate_batch  # noqa: E402
+from validator import render_review_sheet, validate_batch
 
 
 def load_steps(path: str) -> list[dict]:

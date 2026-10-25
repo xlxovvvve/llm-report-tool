@@ -13,8 +13,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any
 
 # 归一化：把空白、全角标点统一，便于跨行/跨格式比对
 _PUNCT_MAP = {

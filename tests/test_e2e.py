@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from llm_report import LLMClient, LLMConfig, LLMError, build_batch_prompt, parse_items
+from llm_report import LLMClient, LLMConfig, build_batch_prompt, parse_items
 from validator import render_review_sheet, validate_batch
 
 STEPS = json.loads(

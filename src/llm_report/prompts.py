@@ -7,7 +7,6 @@
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 # ---------------------------------------------------------------- 系统提示
@@ -99,7 +98,7 @@ def parse_items(payload: dict[str, Any], expected_count: int) -> list[dict[str, 
     """
     items = payload.get("items")
     if not isinstance(items, list):
-        raise ValueError("响应缺少 items 数组")
+        raise TypeError(f"响应缺少 items 数组，实际类型：{type(items).__name__}")
 
     by_index: dict[int, dict[str, Any]] = {}
     for raw in items:
