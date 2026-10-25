@@ -1,0 +1,4 @@
+# 默认按文本处理，检出时统一 LF（保证 Linux CI 与本地一致）
+* text=auto eol=lf
+
+*.png binary
