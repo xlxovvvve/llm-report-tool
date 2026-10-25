@@ -60,28 +60,58 @@ pip install -r requirements-dev.txt
 
 ### 2. 配置密钥
 
+**最省事的方式**（交互式写入 + 自动验证连通性）：
+
+```bash
+python scripts/setup_deepseek.py
+```
+
+会提示你粘贴 API Key，写入 `.env`（已被 gitignore 排除，不会误传），然后立刻做一次连通性自检。
+
+**手动配置**：复制 `.env.example` 为 `.env`，填入密钥即可。程序启动时会自动加载 `.env`
+（已有环境变量优先，方便临时覆盖）。
+
 ```bash
 # Linux/macOS
 export LLM_API_KEY="sk-..."
-export LLM_MODEL="gpt-4o-mini"
-export LLM_BASE_URL="https://api.openai.com/v1"
+export LLM_MODEL="deepseek-chat"
+export LLM_BASE_URL="https://api.deepseek.com/v1"
 
 # Windows PowerShell
 $env:LLM_API_KEY = "sk-..."
 ```
 
-换厂商只需改 `LLM_BASE_URL` 和 `LLM_MODEL`：
+**先做连通性自检**（消耗约 10 token，确认配置无误再正式跑）：
 
 ```bash
-# DeepSeek
-export LLM_BASE_URL="https://api.deepseek.com/v1"
-export LLM_MODEL="deepseek-chat"
-
-# 本地 Ollama
-export LLM_BASE_URL="http://localhost:11434/v1"
-export LLM_MODEL="qwen2.5:7b"
-export LLM_API_KEY="ollama"   # 任意非空值即可
+python src/llm_report/cli.py --check
 ```
+
+```
+============================================================
+LLM 连通性自检
+============================================================
+  base_url : https://api.deepseek.com/v1
+  model    : deepseek-chat
+  api_key  : 已设置 (sk-abc***)
+
+✓ 连接成功
+  返回内容   : {"ok": true}
+  实际模型   : deepseek-chat
+  耗时       : 412 ms
+  token 用量 : prompt 18 / completion 6
+```
+
+**换厂商只需改两个字段**：
+
+| 厂商 | base_url | model |
+|---|---|---|
+| DeepSeek（推荐） | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| 本地 Ollama | `http://localhost:11434/v1` | `qwen2.5:7b` |
+
+> DeepSeek 的 JSON mode 要求 prompt 中必须出现 `json` 字样，否则接口报错。
+> 本项目三处 prompt 均已包含，并有回归测试守住这一点（`tests/test_deepseek_compat.py`）。
 
 ### 3. 先跑自检（不需要 key）
 
@@ -167,15 +197,18 @@ python src/llm_report/cli.py \
 llm-report-tool/
 ├── src/
 │   ├── llm_report/
-│   │   ├── client.py       # LLM 客户端：重试、退避、JSON 稳健提取
+│   │   ├── client.py       # LLM 客户端：重试、退避、JSON 稳健提取、.env 加载
 │   │   ├── prompts.py      # Prompt 模板 + 结构化响应解析
-│   │   └── cli.py          # 命令行入口
+│   │   └── cli.py          # 命令行入口（--selftest / --check / 正式流程）
 │   └── validator/
 │       └── checker.py      # 确定性校验规则（不依赖 LLM）
+├── scripts/
+│   └── setup_deepseek.py   # 交互式配置 + 连通性自检
 ├── examples/
 │   └── steps.json          # 示例输入（真实终端输出）
 ├── tests/
-│   └── test_e2e.py         # 端到端离线测试（mock LLM）
+│   ├── test_e2e.py         # 端到端离线测试（mock LLM）
+│   └── test_deepseek_compat.py  # DeepSeek 特有场景回归测试
 ├── docs/
 │   └── design.md           # 设计说明
 ├── .github/workflows/ci.yml
@@ -208,6 +241,9 @@ llm-report-tool/
 - 校验器只能发现"与日志矛盾"的问题，无法判断解释是否**准确**
 - 数字核验会漏掉小于 2 位的数字（如把 "1 个文件" 说成 "2 个文件" 中的 1）
 - 依赖模型支持 `response_format: json_object`；不支持时靠 prompt 约束 + 重试兜底
+  （DeepSeek 支持，但要求 prompt 中含 `json` 字样——本项目已满足并有测试守住）
+- DeepSeek 等推理模型在 `max_tokens` 被 reasoning token 耗尽时会返回**空 content**，
+  本项目会明确报错并提示调大 `LLM_MAX_TOKENS`，而不是把它当成正常结果
 - 校验的是**引用是否存在**，不校验引用的**片段是否最能支撑结论**
 
 ---

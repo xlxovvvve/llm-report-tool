@@ -34,3 +34,6 @@ jobs:
 
       - name: 端到端离线测试（无需 API key）
         run: python tests/test_e2e.py
+
+      - name: DeepSeek 兼容性测试（无需 API key）
+        run: python tests/test_deepseek_compat.py

@@ -4,7 +4,7 @@
 1. 不绑定厂商 —— 通过 base_url 切换 OpenAI / DeepSeek / 通义 / 本地 Ollama
 2. 强制 JSON 输出 —— 用 response_format 或在 prompt 里约束，降低解析失败率
 3. 失败可重试 —— 网络抖动、限流、JSON 解析失败都重试，且退避
-4. 密钥只从环境变量读，不落盘、不进日志
+4. 密钥优先从环境变量读；也支持从项目根目录的 .env 读取（该文件已被 gitignore 排除）
 """
 from __future__ import annotations
 
@@ -13,33 +13,91 @@ import os
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+
+
+def load_dotenv(path: str | Path | None = None) -> dict[str, str]:
+    """从 .env 文件加载环境变量（已存在的环境变量优先，不覆盖）。
+
+    不依赖 python-dotenv，保持零第三方依赖。
+    返回实际加载的键值对。
+    """
+    if path is None:
+        # 从 src/llm_report/client.py 往上找三层就是项目根
+        path = Path(__file__).resolve().parents[2] / ".env"
+    p = Path(path)
+    if not p.exists():
+        return {}
+
+    loaded: dict[str, str] = {}
+    for raw in p.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k = k.strip()
+        v = v.strip().strip('"').strip("'")
+        loaded[k] = v
+        # 已有环境变量优先（方便临时覆盖）
+        os.environ.setdefault(k, v)
+    return loaded
 
 
 class LLMError(RuntimeError):
     """LLM 调用失败（已重试耗尽）。"""
 
 
-@dataclass
+@dataclass(init=False)
 class LLMConfig:
-    """模型配置。所有字段都可从环境变量覆盖。"""
+    """模型配置。
 
-    model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "gpt-4o-mini"))
-    base_url: str = field(
-        default_factory=lambda: os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
-    )
-    api_key: str = field(default_factory=lambda: os.getenv("LLM_API_KEY", ""))
-    temperature: float = field(default_factory=lambda: float(os.getenv("LLM_TEMPERATURE", "0.2")))
-    max_tokens: int = field(default_factory=lambda: int(os.getenv("LLM_MAX_TOKENS", "2048")))
-    timeout: int = field(default_factory=lambda: int(os.getenv("LLM_TIMEOUT", "60")))
-    max_retries: int = field(default_factory=lambda: int(os.getenv("LLM_MAX_RETRIES", "3")))
+    优先级：已存在的环境变量 > 项目根目录 .env > 内置默认值。
+    也支持直接传参覆盖（用于测试）。
+    """
+
+    model: str
+    base_url: str
+    api_key: str
+    temperature: float
+    max_tokens: int
+    timeout: int
+    max_retries: int
+
+    def __init__(
+        self,
+        model: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout: int | None = None,
+        max_retries: int | None = None,
+    ) -> None:
+        # 先加载 .env（不覆盖已有环境变量），再决定各字段取值
+        load_dotenv()
+        self.model = model or os.getenv("LLM_MODEL", "gpt-4o-mini")
+        self.base_url = base_url or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+        self.api_key = api_key if api_key is not None else os.getenv("LLM_API_KEY", "")
+        self.temperature = (
+            temperature
+            if temperature is not None
+            else float(os.getenv("LLM_TEMPERATURE", "0.2"))
+        )
+        self.max_tokens = (
+            max_tokens if max_tokens is not None else int(os.getenv("LLM_MAX_TOKENS", "2048"))
+        )
+        self.timeout = timeout if timeout is not None else int(os.getenv("LLM_TIMEOUT", "60"))
+        self.max_retries = (
+            max_retries if max_retries is not None else int(os.getenv("LLM_MAX_RETRIES", "3"))
+        )
 
     def validate(self) -> None:
         if not self.api_key:
             raise LLMError(
                 "未配置 LLM_API_KEY。请设置环境变量 LLM_API_KEY，"
-                "或在 .env 中写入后由 load_dotenv 载入。"
+                "或在项目根目录的 .env 中写入（可运行 scripts/setup_deepseek.py 生成）。"
             )
 
 
@@ -122,6 +180,15 @@ class LLMClient:
             try:
                 raw = self._post(payload)
                 content = raw["choices"][0]["message"]["content"]
+                # DeepSeek 等厂商在 reasoning token 耗尽时会返回空 content，
+                # 此时不能当成正常结果，否则后面 JSON 解析会莫名失败。
+                if not content or not content.strip():
+                    finish = raw["choices"][0].get("finish_reason")
+                    raise LLMError(
+                        f"模型返回空内容（finish_reason={finish}），"
+                        f"可能是 max_tokens 被 reasoning token 耗尽，"
+                        f"请调大 LLM_MAX_TOKENS"
+                    )
                 usage = raw.get("usage") or {}
                 return LLMResponse(
                     content=content,

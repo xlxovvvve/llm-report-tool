@@ -85,6 +85,50 @@ def render_report(
     return "\n".join(lines)
 
 
+def check_connection() -> int:
+    """连通性自检：发一个最小请求，验证密钥/网络/模型是否可用。
+
+    消耗极少 token（约 10 token），适合在正式跑之前先确认配置无误。
+    """
+    from llm_report import LLMError
+
+    cfg = LLMConfig()
+    print("=" * 60)
+    print("LLM 连通性自检")
+    print("=" * 60)
+    print(f"  base_url : {cfg.base_url}")
+    print(f"  model    : {cfg.model}")
+    print(f"  api_key  : {'已设置 (' + cfg.api_key[:6] + '***)' if cfg.api_key else '未设置'}")
+    print()
+
+    if not cfg.api_key:
+        print("✗ 未配置 LLM_API_KEY。")
+        print("  请设置环境变量，或在 .env 中写入后由 shell 载入。")
+        return 1
+
+    client = LLMClient(cfg)
+    try:
+        resp = client.complete(
+            "你是一个连通性测试助手，只回复一个 JSON 对象。",
+            '请只输出这个 JSON：{"ok": true}',
+            json_mode=True,
+            temperature=0.0,
+        )
+    except LLMError as e:
+        print(f"✗ 调用失败：{e}")
+        return 1
+
+    print("✓ 连接成功")
+    print(f"  返回内容   : {resp.content.strip()[:80]}")
+    print(f"  实际模型   : {resp.model}")
+    print(f"  耗时       : {resp.latency_ms} ms")
+    print(f"  token 用量 : prompt {resp.prompt_tokens} / completion {resp.completion_tokens}")
+    print()
+    print("可以正式使用了：")
+    print("  python src/llm_report/cli.py --input examples/steps.json --out out/report.md")
+    return 0
+
+
 def selftest() -> int:
     """自检：验证校验器能识别编造内容，且不需要 API key。"""
     from validator import validate_item
@@ -160,7 +204,11 @@ def main() -> int:
     ap.add_argument("--review", default=None, help="人工终检清单输出路径")
     ap.add_argument("--batch-size", type=int, default=5, help="每批送入 LLM 的步骤数")
     ap.add_argument("--selftest", action="store_true", help="运行自检（不需要 API key）")
+    ap.add_argument("--check", action="store_true", help="连通性自检：验证密钥/网络/模型（消耗极少 token）")
     args = ap.parse_args()
+
+    if args.check:
+        return check_connection()
 
     if args.selftest:
         return selftest()
