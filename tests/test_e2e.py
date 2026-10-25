@@ -70,9 +70,8 @@ def main() -> int:
 
     client = MockLLM()
     payload = client.complete_json("system", build_batch_prompt(STEPS))
-    items = parse_items(payload, len(STEPS))
-    for j, p in enumerate(items):
-        p["index"] = STEPS[j]["index"]
+    items = parse_items(payload, [s["index"] for s in STEPS])
+
     print(f"[1] mock 生成 {len(items)} 条")
 
     report = validate_batch(items, STEPS)

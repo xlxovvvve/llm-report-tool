@@ -27,6 +27,44 @@
 
 ---
 
+## 真实运行验证
+
+本项目不是纸面设计——下面是用 **DeepSeek 真实调用**跑出来的结果
+（2026-10-25，模型 `deepseek-chat`，9 个实验步骤，耗时 7.2 秒）：
+
+```
+[1/4] 读取步骤：9 条
+[2/4] 调用 LLM：deepseek-chat @ https://api.deepseek.com/v1
+      批次 1: 5 条已生成
+      批次 2: 4 条已生成
+[3/4] 规则校验（source_output 逐字比对原始日志）
+      检查 9 个步骤，通过 9 个，ERROR 0 条，WARNING 0 条
+[4/4] 输出：out\report.md / out\report.items.json / out\report_review.md
+
+校验通过（WARNING 需人工确认）
+```
+
+**防编造防线也做了反向验证**——手动注入三种异常后重跑校验，全部被精确拦截：
+
+| 注入的异常 | 校验结果 |
+|---|---|
+| `source_output` 换成日志里不存在的文字 | `ERROR FABRICATED_SOURCE` ✅ 拦截 |
+| 结果里把 7880 字节写成 9999 字节 | `WARNING UNVERIFIED_NUMBER` ✅ 告警 |
+| 删掉 `result` 字段 | `ERROR MISSING_FIELD` ✅ 拦截 |
+
+完整产物见 [`examples/verified/`](examples/verified/)：
+
+- `report_deepseek_run.md` —— 真实生成的报告草稿
+- `review_deepseek_run.md` —— 人工终检清单
+- `items_deepseek_run.json` —— 结构化结果
+
+运行元数据见 [`docs/verified_run.json`](docs/verified_run.json)。
+
+> 这三份样本是**故意留在仓库里的**——面试时可以直接打开给面试官看，
+> 证明这不是"设计文档里YY的"，而是真跑出来的东西。
+
+---
+
 ## 核心特性
 
 | 特性 | 说明 |
@@ -205,12 +243,14 @@ llm-report-tool/
 ├── scripts/
 │   └── setup_deepseek.py   # 交互式配置 + 连通性自检
 ├── examples/
-│   └── steps.json          # 示例输入（真实终端输出）
+│   ├── steps.json          # 示例输入（真实终端输出）
+│   └── verified/           # DeepSeek 真实调用产物（可直接给面试官看）
 ├── tests/
 │   ├── test_e2e.py         # 端到端离线测试（mock LLM）
 │   └── test_deepseek_compat.py  # DeepSeek 特有场景回归测试
 ├── docs/
-│   └── design.md           # 设计说明
+│   ├── design.md           # 设计说明
+│   └── verified_run.json   # 真实运行元数据
 ├── .github/workflows/ci.yml
 ├── requirements-dev.txt
 └── README.md

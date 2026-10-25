@@ -1,0 +1,21 @@
+{
+  "verified_at": "2026-10-25",
+  "provider": "DeepSeek",
+  "model_requested": "deepseek-chat",
+  "model_returned": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com/v1",
+  "dataset": "examples/steps.json",
+  "steps_total": 9,
+  "steps_passed": 9,
+  "errors": 0,
+  "warnings": 0,
+  "wall_time_sec": 7.2,
+  "batches": 2,
+  "batch_size": 5,
+  "tamper_check": {
+    "note": "注入三种异常后重跑校验，确认防线真实有效",
+    "FABRICATED_SOURCE": "caught",
+    "MISSING_FIELD": "caught",
+    "UNVERIFIED_NUMBER": "caught"
+  }
+}

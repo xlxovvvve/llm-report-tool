@@ -237,9 +237,8 @@ def main() -> int:
             payload = client.complete_json(
                 BATCH_SYSTEM_PROMPT, build_batch_prompt(chunk)
             )
-            parsed = parse_items(payload, len(chunk))
-            for j, p in enumerate(parsed):
-                p["index"] = chunk[j]["index"]
+            # 传全局 index 列表，让 parse_items 能正确对齐（模型回填的可能是全局 index）
+            parsed = parse_items(payload, [s["index"] for s in chunk])
             items.extend(parsed)
             print(f"      批次 {start // args.batch_size + 1}: {len(chunk)} 条已生成")
             time.sleep(0.2)

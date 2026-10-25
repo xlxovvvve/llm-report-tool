@@ -90,17 +90,27 @@ def build_batch_prompt(steps: list[dict[str, Any]]) -> str:
 
 
 # ---------------------------------------------------------------- 结构化模型
-def parse_items(payload: dict[str, Any], expected_count: int) -> list[dict[str, Any]]:
+def parse_items(
+    payload: dict[str, Any],
+    expected_indices: list[int],
+) -> list[dict[str, Any]]:
     """解析批量响应并做基础结构校验。
 
     这里做**宽松**解析：数量不匹配时按 index 对齐，缺的留空。
     严格的一致性校验交给 validator 模块（那里能拿到原始输出做交叉比对）。
+
+    expected_indices: 本批步骤的**全局** index 列表，如 [5, 6, 7, 8]。
+
+    两种 index 约定都要兼容：
+    1. 模型返回全局 index（本项目的 prompt 给的是全局 index，DeepSeek 等
+       模型会如实回填）—— 直接按返回值匹配
+    2. 模型返回批内序号 0..N-1 —— 按位置回退匹配
     """
     items = payload.get("items")
     if not isinstance(items, list):
         raise TypeError(f"响应缺少 items 数组，实际类型：{type(items).__name__}")
 
-    by_index: dict[int, dict[str, Any]] = {}
+    raw_by_index: dict[int, dict[str, Any]] = {}
     for raw in items:
         if not isinstance(raw, dict):
             continue
@@ -108,18 +118,21 @@ def parse_items(payload: dict[str, Any], expected_count: int) -> list[dict[str, 
             idx = int(raw.get("index"))
         except (TypeError, ValueError):
             continue
-        by_index[idx] = {
+        raw_by_index[idx] = {
             "meaning": (raw.get("meaning") or "").strip(),
             "result": (raw.get("result") or "").strip(),
             "source_output": (raw.get("source_output") or "").strip(),
         }
 
+    empty = {"meaning": "", "result": "", "source_output": "", "missing": True}
     out: list[dict[str, Any]] = []
-    for i in range(expected_count):
-        out.append(
-            by_index.get(
-                i,
-                {"meaning": "", "result": "", "source_output": "", "missing": True},
-            )
-        )
+    for pos, global_idx in enumerate(expected_indices):
+        # 优先按模型返回的 index 精确匹配；匹配不到再按批内序号回退
+        item = raw_by_index.get(global_idx)
+        if item is None:
+            item = raw_by_index.get(pos, dict(empty))
+        else:
+            item = dict(item)
+        item["index"] = global_idx
+        out.append(item)
     return out
