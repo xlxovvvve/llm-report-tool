@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "source": "Linux 程序设计上机实验 —— 动态库创建与调用 / make 工程化构建",
+    "note": "本文件中的 output 均为 CentOS 7 客户机上的真实终端输出，账户 wht"
+  },
+  "steps": [
+    {
+      "index": 0,
+      "title": "创建实验目录",
+      "command": "sudo mkdir -p /root/wht+OtherHeadFiles /root/wht+OtherLibs && sudo chown -R wht:wht /root/wht+OtherHeadFiles /root/wht+OtherLibs && ls -ld /root/wht+OtherHeadFiles /root/wht+OtherLibs",
+      "output": "drwxr-xr-x. 2 wht wht 21 Oct 24 02:01 /root/wht+OtherHeadFiles\ndrwxr-xr-x. 2 wht wht 23 Oct 24 02:06 /root/wht+OtherLibs"
+    },
+    {
+      "index": 1,
+      "title": "查看头文件 MyLib.h",
+      "command": "cat /root/wht+OtherHeadFiles/MyLib.h",
+      "output": "#ifndef _MYLIB_H_\n#define _MYLIB_H_\nint add(int, int);\n#endif"
+    },
+    {
+      "index": 2,
+      "title": "编译生成动态库 libadd.so",
+      "command": "cd /root/wht && gcc -fPIC -shared -I../wht+OtherHeadFiles/ -o libadd.so add.c && ls -l libadd.so && file libadd.so",
+      "output": "-rwxr-xr-x. 1 wht wht 7880 Oct 24 02:11 libadd.so\nlibadd.so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, not stripped"
+    },
+    {
+      "index": 3,
+      "title": "链接生成可执行程序 Compute",
+      "command": "cd /root/wht && gcc Compute.c -o Compute -I../wht+OtherHeadFiles/ -L../wht+OtherLibs/ -ladd && ls -l Compute && file Compute",
+      "output": "-rwxr-xr-x. 1 wht wht 8400 Oct 24 02:14 Compute\nCompute: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, not stripped"
+    },
+    {
+      "index": 4,
+      "title": "运行可执行程序",
+      "command": "cd /root/wht && ./Compute",
+      "output": "3 + 4 = 7"
+    },
+    {
+      "index": 5,
+      "title": "ldd 验证动态库链接",
+      "command": "cd /root/wht && ldd Compute | grep add",
+      "output": "\tlibadd.so => /root/wht+OtherLibs/libadd.so (0x00007ffff7d5c000)"
+    },
+    {
+      "index": 6,
+      "title": "make 一键构建",
+      "command": "cd /root/wht && make",
+      "output": "gcc -c -o del_str.o del_str.c\ngcc -c -o print_str.o print_str.c\ngcc -c -o mystr.o mystr.c\ngcc -o Str del_str.o print_str.o mystr.o"
+    },
+    {
+      "index": 7,
+      "title": "运行 make 产物",
+      "command": "cd /root/wht && ./Str",
+      "output": "Hllo Linux, wlcom to C Programming!"
+    },
+    {
+      "index": 8,
+      "title": "make clean 清理中间产物",
+      "command": "cd /root/wht && make clean",
+      "output": "rm -f del_str.o print_str.o mystr.o Str"
+    }
+  ]
+}
